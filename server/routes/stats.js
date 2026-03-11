@@ -4,46 +4,49 @@ const db = require('../db');
 const auth = require('../middleware/auth');
 
 // GET /api/stats/dashboard - Overall dashboard stats for the user
-router.get('/dashboard', auth, (req, res) => {
+router.get('/dashboard', auth, async (req, res) => {
     try {
-        const totalQuestions = db.prepare('SELECT COUNT(*) as count FROM questions WHERE user_id = ?').get(req.user.id).count;
-        const totalSeen = db.prepare('SELECT COUNT(*) as count FROM questions WHERE user_id = ? AND times_seen > 0').get(req.user.id).count;
-        const totalStarred = db.prepare('SELECT COUNT(*) as count FROM questions WHERE user_id = ? AND starred = 1').get(req.user.id).count;
-        const totalSubjects = db.prepare('SELECT COUNT(*) as count FROM subjects WHERE user_id = ?').get(req.user.id).count;
-        const totalDecks = db.prepare('SELECT COUNT(*) as count FROM decks WHERE user_id = ?').get(req.user.id).count;
+        const totalQuestions = parseInt((await db.query('SELECT COUNT(*) as count FROM questions WHERE user_id = $1', [req.user.id])).rows[0].count, 10);
+        const totalSeen = parseInt((await db.query('SELECT COUNT(*) as count FROM questions WHERE user_id = $1 AND times_seen > 0', [req.user.id])).rows[0].count, 10);
+        const totalStarred = parseInt((await db.query('SELECT COUNT(*) as count FROM questions WHERE user_id = $1 AND starred = 1', [req.user.id])).rows[0].count, 10);
+        const totalSubjects = parseInt((await db.query('SELECT COUNT(*) as count FROM subjects WHERE user_id = $1', [req.user.id])).rows[0].count, 10);
+        const totalDecks = parseInt((await db.query('SELECT COUNT(*) as count FROM decks WHERE user_id = $1', [req.user.id])).rows[0].count, 10);
 
         // Completed sessions stats
-        const sessions = db.prepare('SELECT * FROM test_sessions WHERE completed = 1 AND user_id = ?').all(req.user.id);
+        const sessionsRes = await db.query('SELECT * FROM test_sessions WHERE completed = 1 AND user_id = $1', [req.user.id]);
+        const sessions = sessionsRes.rows;
         const completedTests = sessions.length;
         const avgScore = sessions.length > 0
             ? Math.round(sessions.reduce((sum, s) => sum + s.score_percent, 0) / sessions.length * 10) / 10
             : 0;
 
         // Daily streak calculation
-        const streak = calculateStreak(req.user.id);
+        const streak = await calculateStreak(req.user.id);
 
         // Today's activity
         const today = new Date().toISOString().split('T')[0];
-        const todayActivity = db.prepare('SELECT * FROM daily_activity_v2 WHERE user_id = ? AND date = ?').get(req.user.id, today);
+        const todayActivityRes = await db.query('SELECT * FROM daily_activity_v2 WHERE user_id = $1 AND date = $2', [req.user.id, today]);
+        const todayActivity = todayActivityRes.rows[0];
 
         // Recent activity (last 7 days)
-        const recentActivity = db.prepare(`
+        const recentActivityRes = await db.query(`
       SELECT * FROM daily_activity_v2
-      WHERE user_id = ? AND date >= date('now', '-7 days')
+      WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '7 days'
       ORDER BY date DESC
-    `).all(req.user.id);
+    `, [req.user.id]);
+        const recentActivity = recentActivityRes.rows;
 
         // Questions due for review
-        const reviewDue = db.prepare(`
+        const reviewDue = parseInt((await db.query(`
       SELECT COUNT(*) as count FROM questions
-      WHERE user_id = ? AND next_review_at IS NOT NULL AND next_review_at <= datetime('now')
-    `).get(req.user.id).count;
+      WHERE user_id = $1 AND next_review_at IS NOT NULL AND next_review_at <= NOW()
+    `, [req.user.id])).rows[0].count, 10);
 
         // Wrong answers count (questions answered wrong at least once)
-        const wrongCount = db.prepare(`
+        const wrongCount = parseInt((await db.query(`
       SELECT COUNT(*) as count FROM questions
-      WHERE user_id = ? AND times_seen > 0 AND times_correct < times_seen
-    `).get(req.user.id).count;
+      WHERE user_id = $1 AND times_seen > 0 AND times_correct < times_seen
+    `, [req.user.id])).rows[0].count, 10);
 
         res.json({
             totalQuestions,
@@ -66,16 +69,16 @@ router.get('/dashboard', auth, (req, res) => {
 });
 
 // GET /api/stats/review - Smart review queue counts for user
-router.get('/review', auth, (req, res) => {
+router.get('/review', auth, async (req, res) => {
     try {
-        const starred = db.prepare('SELECT COUNT(*) as count FROM questions WHERE user_id = ? AND starred = 1').get(req.user.id).count;
-        const wrong = db.prepare('SELECT COUNT(*) as count FROM questions WHERE user_id = ? AND times_seen > 0 AND times_correct < times_seen').get(req.user.id).count;
-        const reviewDue = db.prepare('SELECT COUNT(*) as count FROM questions WHERE user_id = ? AND next_review_at IS NOT NULL AND next_review_at <= datetime("now")').get(req.user.id).count;
-        const unseen = db.prepare('SELECT COUNT(*) as count FROM questions WHERE user_id = ? AND times_seen = 0').get(req.user.id).count;
-        const recentlyCorrect = db.prepare(`
+        const starred = parseInt((await db.query('SELECT COUNT(*) as count FROM questions WHERE user_id = $1 AND starred = 1', [req.user.id])).rows[0].count, 10);
+        const wrong = parseInt((await db.query('SELECT COUNT(*) as count FROM questions WHERE user_id = $1 AND times_seen > 0 AND times_correct < times_seen', [req.user.id])).rows[0].count, 10);
+        const reviewDue = parseInt((await db.query('SELECT COUNT(*) as count FROM questions WHERE user_id = $1 AND next_review_at IS NOT NULL AND next_review_at <= NOW()', [req.user.id])).rows[0].count, 10);
+        const unseen = parseInt((await db.query('SELECT COUNT(*) as count FROM questions WHERE user_id = $1 AND times_seen = 0', [req.user.id])).rows[0].count, 10);
+        const recentlyCorrect = parseInt((await db.query(`
       SELECT COUNT(*) as count FROM questions
-      WHERE user_id = ? AND times_correct > 0 AND last_seen_at >= datetime('now', '-3 days')
-    `).get(req.user.id).count;
+      WHERE user_id = $1 AND times_correct > 0 AND last_seen_at >= NOW() - INTERVAL '3 days'
+    `, [req.user.id])).rows[0].count, 10);
 
         res.json({ starred, wrong, reviewDue, unseen, recentlyCorrect });
     } catch (err) {
@@ -83,12 +86,13 @@ router.get('/review', auth, (req, res) => {
     }
 });
 
-function calculateStreak(userId) {
-    const activities = db.prepare(`
+async function calculateStreak(userId) {
+    const activitiesRes = await db.query(`
     SELECT date FROM daily_activity_v2
-    WHERE user_id = ? AND questions_answered > 0
+    WHERE user_id = $1 AND questions_answered > 0
     ORDER BY date DESC
-  `).all(userId);
+  `, [userId]);
+    const activities = activitiesRes.rows;
 
     if (activities.length === 0) return 0;
 

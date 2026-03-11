@@ -5,9 +5,10 @@ const auth = require('../middleware/auth');
 const { aiExplainAnswer } = require('../ai');
 
 // GET /api/settings
-router.get('/', auth, (req, res) => {
+router.get('/', auth, async (req, res) => {
     try {
-        const rows = db.prepare('SELECT key, value FROM user_settings WHERE user_id = ?').all(req.user.id);
+        const result = await db.query('SELECT key, value FROM user_settings WHERE user_id = $1', [req.user.id]);
+        const rows = result.rows;
         const settings = {};
         rows.forEach(r => {
             // Mask API keys for security
@@ -25,18 +26,14 @@ router.get('/', auth, (req, res) => {
 });
 
 // PUT /api/settings
-router.put('/', auth, (req, res) => {
+router.put('/', auth, async (req, res) => {
     try {
         const updates = req.body;
-        const upsert = db.prepare('INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)');
-        const updateMany = db.transaction((entries) => {
-            for (const [key, value] of entries) {
-                // Don't overwrite with masked value
-                if (key.includes('api_key') && value && value.startsWith('••••')) continue;
-                upsert.run(req.user.id, key, value);
-            }
-        });
-        updateMany(Object.entries(updates));
+        for (const [key, value] of Object.entries(updates)) {
+            // Don't overwrite with masked value
+            if (key.includes('api_key') && value && value.startsWith('••••')) continue;
+            await db.query('INSERT INTO user_settings (user_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (user_id, key) DO UPDATE SET value = EXCLUDED.value', [req.user.id, key, value]);
+        }
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -47,15 +44,16 @@ router.put('/', auth, (req, res) => {
 router.post('/explain', auth, async (req, res) => {
     try {
         const { question_id } = req.body;
-        const question = db.prepare('SELECT * FROM questions WHERE id = ? AND user_id = ?').get(question_id, req.user.id);
+        const questionRes = await db.query('SELECT * FROM questions WHERE id = $1 AND user_id = $2', [question_id, req.user.id]);
+        const question = questionRes.rows[0];
         if (!question) return res.status(404).json({ error: 'Question not found' });
 
         const options = JSON.parse(question.options);
 
         // Check for API key
-        const rows = db.prepare('SELECT key, value FROM user_settings WHERE user_id = ?').all(req.user.id);
+        const rowsRes = await db.query('SELECT key, value FROM user_settings WHERE user_id = $1', [req.user.id]);
         const settings = {};
-        rows.forEach(r => settings[r.key] = r.value);
+        rowsRes.rows.forEach(r => settings[r.key] = r.value);
 
         let explanation = null;
         const preferred = settings.preferred_ai || 'local';
@@ -80,7 +78,7 @@ router.post('/explain', auth, async (req, res) => {
         }
 
         // Save the explanation
-        db.prepare('UPDATE questions SET explanation = ? WHERE id = ? AND user_id = ?').run(explanation, question_id, req.user.id);
+        await db.query('UPDATE questions SET explanation = $1 WHERE id = $2 AND user_id = $3', [explanation, question_id, req.user.id]);
 
         res.json({ explanation, source: preferred });
     } catch (err) {

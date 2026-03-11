@@ -23,9 +23,9 @@ router.post('/parse', auth, async (req, res) => {
         let questions = null;
 
         // Try AI parsing first if API key is available
+        const settingsRes = await db.query('SELECT key, value FROM user_settings WHERE user_id = $1', [req.user.id]);
         const settings = {};
-        const rows = db.prepare('SELECT key, value FROM user_settings WHERE user_id = ?').all(req.user.id);
-        rows.forEach(r => settings[r.key] = r.value);
+        settingsRes.rows.forEach(r => settings[r.key] = r.value);
 
         const preferredAi = settings.preferred_ai || 'local';
 
@@ -52,14 +52,17 @@ router.post('/parse', auth, async (req, res) => {
             return res.status(400).json({ error: 'Could not parse any questions from the input. Try a different format.' });
         }
 
-        const existingSubjects = db.prepare('SELECT * FROM subjects WHERE user_id = ?').all(req.user.id);
+        const existingSubjRes = await db.query('SELECT * FROM subjects WHERE user_id = $1', [req.user.id]);
+        const existingSubjects = existingSubjRes.rows;
         const suggestions = suggestSubject(questions, existingSubjects);
-        const decks = db.prepare(`
+
+        const decksRes = await db.query(`
       SELECT d.*, s.name as subject_name FROM decks d
       JOIN subjects s ON d.subject_id = s.id
-      WHERE d.user_id = ?
+      WHERE d.user_id = $1
       ORDER BY s.name, d.name
-    `).all(req.user.id);
+    `, [req.user.id]);
+        const decks = decksRes.rows;
 
         res.json({
             questions,
@@ -117,14 +120,17 @@ router.post('/parse-file', auth, upload.single('file'), async (req, res) => {
             });
         }
 
-        const existingSubjects = db.prepare('SELECT * FROM subjects WHERE user_id = ?').all(req.user.id);
+        const existingSubjRes = await db.query('SELECT * FROM subjects WHERE user_id = $1', [req.user.id]);
+        const existingSubjects = existingSubjRes.rows;
         const suggestions = suggestSubject(questions, existingSubjects);
-        const decks = db.prepare(`
+
+        const decksRes = await db.query(`
       SELECT d.*, s.name as subject_name FROM decks d
       JOIN subjects s ON d.subject_id = s.id
-      WHERE d.user_id = ?
+      WHERE d.user_id = $1
       ORDER BY s.name, d.name
-    `).all(req.user.id);
+    `, [req.user.id]);
+        const decks = decksRes.rows;
 
         res.json({
             questions,
@@ -147,8 +153,8 @@ router.post('/parse-file', auth, upload.single('file'), async (req, res) => {
 function convertMarkdownToText(md) {
     return md
         // Remove code fences
-        .replace(/```[\s\S]*?```/g, '')
-        .replace(/`([^`]+)`/g, '$1')
+        .replace(/\`\`\`[\s\S]*?\`\`\`/g, '')
+        .replace(/\`([^\`]+)\`/g, '$1')
         // Convert headings to plain text
         .replace(/^#{1,6}\s+/gm, '')
         // Bold and italic
@@ -170,7 +176,7 @@ function convertMarkdownToText(md) {
 }
 
 // POST /api/import/save - Save parsed questions to a deck
-router.post('/save', auth, (req, res) => {
+router.post('/save', auth, async (req, res) => {
     try {
         const { questions, deck_id, new_deck_name, subject_id, new_subject_name, new_subject_color } = req.body;
 
@@ -183,10 +189,11 @@ router.post('/save', auth, (req, res) => {
         // Create new subject if needed
         let targetSubjectId = subject_id;
         if (new_subject_name && !subject_id) {
-            const result = db.prepare(
-                'INSERT INTO subjects (user_id, name, color) VALUES (?, ?, ?)'
-            ).run(req.user.id, new_subject_name, new_subject_color || '#3b82f6');
-            targetSubjectId = result.lastInsertRowid;
+            const subjRes = await db.query(
+                'INSERT INTO subjects (user_id, name, color) VALUES ($1, $2, $3) RETURNING id',
+                [req.user.id, new_subject_name, new_subject_color || '#3b82f6']
+            );
+            targetSubjectId = subjRes.rows[0].id;
         }
 
         // Create new deck if needed
@@ -194,36 +201,31 @@ router.post('/save', auth, (req, res) => {
             if (!targetSubjectId) {
                 return res.status(400).json({ error: 'Subject is required when creating a new deck' });
             }
-            const result = db.prepare(
-                'INSERT INTO decks (user_id, name, subject_id) VALUES (?, ?, ?)'
-            ).run(req.user.id, new_deck_name, targetSubjectId);
-            targetDeckId = result.lastInsertRowid;
+            const deckRes = await db.query(
+                'INSERT INTO decks (user_id, name, subject_id) VALUES ($1, $2, $3) RETURNING id',
+                [req.user.id, new_deck_name, targetSubjectId]
+            );
+            targetDeckId = deckRes.rows[0].id;
         }
 
         if (!targetDeckId) {
             return res.status(400).json({ error: 'A deck must be specified or created' });
         }
 
-        // Insert all questions using a transaction for speed and atomicity
-        const insertQ = db.prepare(`
-      INSERT INTO questions (user_id, deck_id, question_text, options, correct_index, explanation)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-        const insertMany = db.transaction((qs) => {
-            for (const q of qs) {
-                insertQ.run(
-                    req.user.id,
-                    targetDeckId,
-                    q.question_text,
-                    JSON.stringify(q.options),
-                    q.correct_index,
-                    q.explanation || ''
-                );
-            }
-        });
-
-        insertMany(questions);
+        // Insert all questions sequentially
+        for (const q of questions) {
+            await db.query(`
+              INSERT INTO questions (user_id, deck_id, question_text, options, correct_index, explanation)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [
+                req.user.id,
+                targetDeckId,
+                q.question_text,
+                JSON.stringify(q.options),
+                q.correct_index,
+                q.explanation || ''
+            ]);
+        }
 
         res.status(201).json({
             success: true,

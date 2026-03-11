@@ -17,8 +17,8 @@ router.post('/register', async (req, res) => {
         }
 
         // Check for existing user
-        const existingUser = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-        if (existingUser) {
+        const existingUserResult = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+        if (existingUserResult.rows.length > 0) {
             return res.status(400).json({ error: 'User already exists' });
         }
 
@@ -27,8 +27,8 @@ router.post('/register', async (req, res) => {
         const hash = await bcrypt.hash(password, salt);
 
         // Insert new user
-        const result = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, hash);
-        const user_id = result.lastInsertRowid;
+        const result = await db.query('INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id', [username, hash]);
+        const user_id = result.rows[0].id;
 
         // Sign JWT
         jwt.sign(
@@ -58,7 +58,8 @@ router.post('/login', async (req, res) => {
         }
 
         // Check for existing user
-        const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+        const userResult = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+        const user = userResult.rows[0];
         if (!user) {
             return res.status(400).json({ error: 'Invalid credentials' });
         }
@@ -89,9 +90,10 @@ router.post('/login', async (req, res) => {
 
 // GET /api/auth/me
 // Get currently logged in user info
-router.get('/me', auth, (req, res) => {
+router.get('/me', auth, async (req, res) => {
     try {
-        const user = db.prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(req.user.id);
+        const userResult = await db.query('SELECT id, username, role, created_at FROM users WHERE id = $1', [req.user.id]);
+        const user = userResult.rows[0];
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
