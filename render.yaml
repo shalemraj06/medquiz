@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: medquiz
+    env: node
+    plan: free # Change this to 'starter' if you want a faster server!
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_DIR
+        value: /data
+      - key: JWT_SECRET
+        generateValue: true
+    disk:
+      name: medquiz-database
+      mountPath: /data
+      sizeGB: 1
