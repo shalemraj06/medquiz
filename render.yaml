@@ -1,14 +1,1 @@
-services:
-- type: web
-  name: medquiz
-    env: node
-      plan: free
-        buildCommand: npm install && npm run build
-          startCommand: npm run start
-            envVars:
-              - key: NODE_ENV
-                  value: production
-                    - key: JWT_SECRET
-                        generateValue: true
-                          - key: DATABASE_URL
-                              sync: false
+services: [{type: web, name: medquiz, env: node, plan: free, buildCommand: "npm install && npm run build", startCommand: "npm run start", envVars: [{key: DATABASE_URL, sync: false}]}]
