@@ -8,5 +8,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        sync: false # Requires manual entry in Render Dashboard
       - key: JWT_SECRET
         generateValue: true

@@ -1,7 +1,12 @@
 const { Pool } = require('pg');
 
-// Use the provided Supabase URL, allowing environment variable override for Render
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:[YOUR-PASSWORD]@db.fuifmmnlkwoclabsghhs.supabase.co:5432/postgres';
+// DATABASE_URL is required for production (provided by Render/Supabase)
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error('[FATAL] DATABASE_URL is not set. Please set it in your environment variables.');
+  // We don't exit(1) here to allow the server to boot and report the error via /api/health
+}
 
 const pool = new Pool({
   connectionString,
