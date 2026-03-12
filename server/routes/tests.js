@@ -123,34 +123,38 @@ router.post('/:id/answer', auth, async (req, res) => {
       WHERE session_id = $5 AND question_id = $6 AND user_id = $7
     `, [selected_index, isCorrect, time_spent || 0, flagged ? 1 : 0, sessionId, question_id, req.user.id]);
 
-        // Update question stats
-        await db.query(`
-      UPDATE questions SET
-        times_seen = times_seen + 1,
-        times_correct = times_correct + $1,
-        last_seen_at = NOW()
-      WHERE id = $2 AND user_id = $3
-    `, [isCorrect, question_id, req.user.id]);
-
-        // Update spaced repetition
-        await updateSpacedRepetition(question_id, isCorrect, req.user.id);
-
-        // Update daily activity
-        const today = new Date().toISOString().split('T')[0];
-        await db.query(`
-      INSERT INTO daily_activity_v2 (user_id, date, questions_answered, correct_count)
-      VALUES ($1, $2, 1, $3)
-      ON CONFLICT(user_id, date) DO UPDATE SET
-        questions_answered = daily_activity_v2.questions_answered + 1,
-        correct_count = daily_activity_v2.correct_count + $4
-    `, [req.user.id, today, isCorrect, isCorrect]);
-
         res.json({
             is_correct: !!isCorrect,
             correct_index: question.correct_index,
             explanation: question.explanation,
             options: JSON.parse(question.options)
         });
+
+        // Background updates
+        (async () => {
+            try {
+                await db.query(`
+                    UPDATE questions SET
+                        times_seen = times_seen + 1,
+                        times_correct = times_correct + $1,
+                        last_seen_at = NOW()
+                    WHERE id = $2 AND user_id = $3
+                `, [isCorrect, question_id, req.user.id]);
+
+                await updateSpacedRepetition(question_id, isCorrect, req.user.id);
+
+                const today = new Date().toISOString().split('T')[0];
+                await db.query(`
+                    INSERT INTO daily_activity_v2 (user_id, date, questions_answered, correct_count)
+                    VALUES ($1, $2, 1, $3)
+                    ON CONFLICT(user_id, date) DO UPDATE SET
+                        questions_answered = daily_activity_v2.questions_answered + 1,
+                        correct_count = daily_activity_v2.correct_count + $4
+                `, [req.user.id, today, isCorrect, isCorrect]);
+            } catch (bgError) {
+                console.error('[BG ERROR]:', bgError);
+            }
+        })();
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

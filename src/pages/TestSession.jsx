@@ -116,12 +116,10 @@ export default function TestSession({ addToast }) {
                 flagged: !!flagged[currentQ.id]
             })
 
-            // Only reveal immediately if in Tutor mode or Untimed mode
-            if (mode === 'tutor' || mode === 'untimed') {
-                setRevealed(prev => ({ ...prev, [currentQ.id]: result }))
-                if (result.explanation) {
-                    setExplanations(prev => ({ ...prev, [currentQ.id]: result.explanation }))
-                }
+            // Reveal immediately in ALL modes
+            setRevealed(prev => ({ ...prev, [currentQ.id]: result }))
+            if (result.explanation) {
+                setExplanations(prev => ({ ...prev, [currentQ.id]: result.explanation }))
             }
         } catch (err) {
             addToast('Failed to submit answer', 'error')
