@@ -31,7 +31,7 @@ router.get('/dashboard', auth, async (req, res) => {
         // Recent activity (last 7 days)
         const recentActivityRes = await db.query(`
       SELECT * FROM daily_activity_v2
-      WHERE user_id = $1 AND date >= CURRENT_DATE - INTERVAL '7 days'
+      WHERE user_id = $1 AND date >= (CURRENT_DATE - INTERVAL '7 days')
       ORDER BY date DESC
     `, [req.user.id]);
         const recentActivity = recentActivityRes.rows;
@@ -101,7 +101,10 @@ async function calculateStreak(userId) {
     today.setHours(0, 0, 0, 0);
 
     for (let i = 0; i < activities.length; i++) {
-        const actDate = new Date(activities[i].date + 'T00:00:00');
+        const rawDate = activities[i].date;
+        const actDate = rawDate instanceof Date ? new Date(rawDate) : new Date(rawDate + 'T00:00:00');
+        actDate.setHours(0, 0, 0, 0);
+        
         const expectedDate = new Date(today);
         expectedDate.setDate(today.getDate() - i);
         expectedDate.setHours(0, 0, 0, 0);

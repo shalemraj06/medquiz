@@ -98,7 +98,7 @@ const initDb = async () => {
       CREATE TABLE IF NOT EXISTS daily_activity_v2 (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL DEFAULT 1 REFERENCES users(id) ON DELETE CASCADE,
-        date TEXT NOT NULL,
+        date DATE NOT NULL,
         questions_answered INTEGER DEFAULT 0,
         correct_count INTEGER DEFAULT 0,
         UNIQUE(user_id, date)
