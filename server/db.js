@@ -5,8 +5,15 @@ const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:[YOU
 
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false } // Required for Supabase/Render connections
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10000, // 10s timeout
+  idleTimeoutMillis: 30000,
+  max: 20 // Max pool size
 });
+
+// Explicitly log connection attempts
+pool.on('connect', () => console.log('[DB] New client connected to PostgreSQL'));
+pool.on('error', (err) => console.error('[DB] Unexpected error on idle client', err));
 
 // Initialize database tables using PostgreSQL syntax
 const initDb = async () => {
@@ -110,8 +117,20 @@ const initDb = async () => {
         value TEXT NOT NULL,
         PRIMARY KEY (user_id, key)
       );
+
+      -- Schema Enforcement: Ensure daily_activity_v2 date is DATE type
+      DO $$ 
+      BEGIN 
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='daily_activity_v2' AND column_name='date' AND data_type='text') THEN
+          ALTER TABLE daily_activity_v2 ALTER COLUMN date TYPE DATE USING date::DATE;
+        END IF;
+      END $$;
     `);
-    console.log('PostgreSQL database initialized successfully.');
+
+    // Quick probe to verify connection
+    const probe = await pool.query('SELECT NOW() as now');
+    console.log('[DB] Connection verified at:', probe.rows[0].now);
+    console.log('PostgreSQL database initialized and schema enforced successfully.');
   } catch (err) {
     console.error('Error initializing PostgreSQL database:', err);
   }

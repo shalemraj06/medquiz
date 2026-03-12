@@ -64,7 +64,8 @@ router.get('/dashboard', auth, async (req, res) => {
             progressPercent: totalQuestions > 0 ? Math.round((totalSeen / totalQuestions) * 100 * 10) / 10 : 0
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('[STATS ERROR] Dashboard fetch failed:', err);
+        res.status(500).json({ error: 'Failed to load dashboard statistics', details: err.message });
     }
 });
 
@@ -104,7 +105,7 @@ async function calculateStreak(userId) {
         const rawDate = activities[i].date;
         const actDate = rawDate instanceof Date ? new Date(rawDate) : new Date(rawDate + 'T00:00:00');
         actDate.setHours(0, 0, 0, 0);
-        
+
         const expectedDate = new Date(today);
         expectedDate.setDate(today.getDate() - i);
         expectedDate.setHours(0, 0, 0, 0);

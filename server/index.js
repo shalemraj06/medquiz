@@ -39,9 +39,24 @@ app.use('/api/stats', require('./routes/stats'));
 app.use('/api/import', require('./routes/import'));
 app.use('/api/settings', require('./routes/settings'));
 
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check with DB verification
+app.get('/api/health', async (req, res) => {
+    try {
+        const dbCheck = await db.query('SELECT NOW() as now');
+        res.json({
+            status: 'ok',
+            database: 'connected',
+            dbTime: dbCheck.rows[0].now,
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        res.status(503).json({
+            status: 'error',
+            database: 'disconnected',
+            error: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Explicitly serve the root path
@@ -62,8 +77,9 @@ app.use((req, res, next) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-    console.error('Server error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('[SERVER CRITICAL ERROR]:', err);
+    if (err.stack) console.error(err.stack);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
 });
 
 app.listen(PORT, () => {
