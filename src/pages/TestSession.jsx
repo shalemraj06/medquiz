@@ -92,7 +92,7 @@ export default function TestSession({ addToast }) {
             })
         }, 1000)
         return () => clearInterval(interval)
-    }, [mode, timeLeft])
+    }, [mode]) // Do NOT depend on timeLeft here to prevent resets
 
     const formatTime = (seconds) => {
         const m = Math.floor(seconds / 60)
