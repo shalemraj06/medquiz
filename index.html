@@ -2,16 +2,715 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <title>MedQuiz — Medical Quiz Platform</title>
     <meta name="description" content="A powerful medical quiz platform with AI-powered question parsing, spaced repetition, and comprehensive analytics." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>" />
+
+    <!-- ============================================================
+         RESPONSIVE MOBILE FIX — ALL STYLES EMBEDDED
+         ============================================================ -->
+    <style id="mq-responsive-fix">
+      /* ---- GLOBAL OVERFLOWS ---- */
+      html, body {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+
+      img, video, svg, canvas, iframe {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* ---- HAMBURGER BUTTON ---- */
+      #mq-hamburger {
+        display: none;
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 100001;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        width: 46px;
+        height: 46px;
+        font-size: 24px;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+        transition: all 0.2s ease;
+        padding: 0;
+        line-height: 1;
+        font-family: system-ui, -apple-system, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+
+      #mq-hamburger:active {
+        transform: scale(0.9);
+        background: linear-gradient(135deg, #1d4ed8, #1e40af);
+      }
+
+      /* ---- OVERLAY ---- */
+      #mq-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 99999;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        -webkit-tap-highlight-color: transparent;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+      }
+
+      #mq-overlay.active {
+        display: block;
+        opacity: 1;
+      }
+
+      /* =========================================================
+         TABLET & MOBILE  (screen width ≤ 1024px)
+         ========================================================= */
+      @media screen and (max-width: 1024px) {
+
+        /* Show hamburger */
+        #mq-hamburger {
+          display: flex !important;
+        }
+
+        /* ---- SIDEBAR (tagged by JS) ---- */
+        [data-mq-role="sidebar"] {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          bottom: 0 !important;
+          width: 280px !important;
+          max-width: 85vw !important;
+          height: 100vh !important;
+          height: 100dvh !important;
+          z-index: 100000 !important;
+          transform: translateX(-100%) !important;
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          box-shadow: none !important;
+          will-change: transform;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        [data-mq-role="sidebar"].mq-open {
+          transform: translateX(0) !important;
+          box-shadow: 5px 0 30px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        /* ---- MAIN CONTENT (tagged by JS) ---- */
+        [data-mq-role="main"] {
+          width: 100% !important;
+          max-width: 100vw !important;
+          min-width: 0 !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+          padding-top: 65px !important;
+          flex: 1 1 100% !important;
+          overflow-x: hidden !important;
+        }
+
+        /* ---- LAYOUT CONTAINER (tagged by JS) ---- */
+        [data-mq-role="layout"] {
+          width: 100% !important;
+          max-width: 100% !important;
+          min-width: 0 !important;
+          overflow-x: hidden !important;
+          flex-wrap: nowrap !important;
+        }
+
+        /* Override grid layouts that cause overflow */
+        [data-mq-role="layout"][style*="grid-template-columns"] {
+          display: flex !important;
+        }
+
+        /* iOS input zoom prevention */
+        input, select, textarea {
+          font-size: 16px !important;
+        }
+
+        /* Touch-friendly targets */
+        button, a, input[type="submit"], input[type="button"],
+        [role="button"] {
+          min-height: 44px;
+          min-width: 44px;
+        }
+
+        /* Fix any element with hardcoded margin-left */
+        [data-mq-role="main"] *[style*="margin-left"] {
+          margin-left: 0 !important;
+        }
+      }
+
+      /* =========================================================
+         SMALL MOBILE  (≤ 600px)
+         ========================================================= */
+      @media screen and (max-width: 600px) {
+
+        [data-mq-role="sidebar"] {
+          width: 85vw !important;
+          max-width: 300px !important;
+        }
+
+        [data-mq-role="main"] {
+          padding: 60px 10px 20px 10px !important;
+        }
+
+        /* Stack flex/grid children */
+        [data-mq-role="main"] .row,
+        [data-mq-role="main"] [class*="grid"],
+        [data-mq-role="main"] [class*="Grid"],
+        [data-mq-role="main"] [style*="display: flex"],
+        [data-mq-role="main"] [style*="display:flex"] {
+          flex-direction: column !important;
+        }
+
+        /* Cards full width */
+        [data-mq-role="main"] [class*="card"],
+        [data-mq-role="main"] [class*="Card"] {
+          width: 100% !important;
+          max-width: 100% !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+
+        /* Tables: horizontal scroll */
+        table {
+          display: block !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch;
+          white-space: nowrap;
+        }
+
+        /* Headings */
+        h1 { font-size: 1.4rem !important; }
+        h2 { font-size: 1.2rem !important; }
+        h3 { font-size: 1.1rem !important; }
+
+        /* Modals */
+        [class*="modal"],
+        [class*="Modal"],
+        [class*="dialog"],
+        [class*="Dialog"] {
+          width: 95vw !important;
+          max-width: 95vw !important;
+          margin: 10px auto !important;
+          max-height: 90vh !important;
+          overflow-y: auto !important;
+        }
+      }
+
+      /* =========================================================
+         VERY SMALL PHONES  (≤ 380px — iPhone SE etc.)
+         ========================================================= */
+      @media screen and (max-width: 380px) {
+        [data-mq-role="main"] {
+          padding: 55px 6px 15px 6px !important;
+        }
+
+        #mq-hamburger {
+          width: 40px;
+          height: 40px;
+          font-size: 20px;
+          top: 8px;
+          left: 8px;
+        }
+
+        h1 { font-size: 1.2rem !important; }
+        h2 { font-size: 1.05rem !important; }
+      }
+
+      /* =========================================================
+         LANDSCAPE PHONE
+         ========================================================= */
+      @media screen and (max-height: 500px) and (orientation: landscape) {
+        [data-mq-role="sidebar"] {
+          width: 260px !important;
+        }
+
+        [data-mq-role="main"] {
+          padding-top: 50px !important;
+        }
+      }
+
+      /* =========================================================
+         DESKTOP  (≥ 1025px) — everything normal, hide mobile UI
+         ========================================================= */
+      @media screen and (min-width: 1025px) {
+        #mq-hamburger,
+        #mq-overlay {
+          display: none !important;
+        }
+
+        /* Remove data-attribute effects on desktop */
+        [data-mq-role="sidebar"] {
+          transform: none !important;
+          position: relative !important;
+          width: auto !important;
+          max-width: none !important;
+          height: auto !important;
+          z-index: auto !important;
+          box-shadow: none !important;
+          transition: none !important;
+          overflow: visible !important;
+        }
+
+        [data-mq-role="main"] {
+          padding-top: unset !important;
+          flex: unset !important;
+        }
+
+        [data-mq-role="layout"] {
+          flex-wrap: unset !important;
+        }
+      }
+    </style>
   </head>
+
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- ============================================================
+         RESPONSIVE JS — Auto-detects sidebar, adds hamburger toggle
+         ============================================================ -->
+    <script>
+    (function() {
+      'use strict';
+
+      /* ==========================================
+         1. CREATE HAMBURGER BUTTON & OVERLAY
+         ========================================== */
+      var hamburger = document.createElement('button');
+      hamburger.id = 'mq-hamburger';
+      hamburger.setAttribute('aria-label', 'Open navigation menu');
+      hamburger.setAttribute('aria-expanded', 'false');
+      hamburger.textContent = '\u2630'; // ☰
+      document.body.appendChild(hamburger);
+
+      var overlay = document.createElement('div');
+      overlay.id = 'mq-overlay';
+      document.body.appendChild(overlay);
+
+      /* ==========================================
+         2. STATE VARIABLES
+         ========================================== */
+      var sidebar = null;
+      var mainContent = null;
+      var layoutContainer = null;
+      var isOpen = false;
+      var detected = false;
+
+      /* ==========================================
+         3. SIDEBAR DETECTION ENGINE
+         Tries 3 methods to find your sidebar
+         ========================================== */
+      function findSidebar() {
+        var root = document.getElementById('root');
+        if (!root || !root.children.length) return false;
+
+        sidebar = null;
+        mainContent = null;
+        layoutContainer = null;
+
+        // ------- METHOD 1: Search by class name patterns -------
+        var classPatterns = [
+          'sidebar', 'Sidebar', 'SideBar', 'side-bar', 'side_bar',
+          'sidenav', 'SideNav', 'side-nav', 'side_nav',
+          'drawer', 'Drawer',
+          'nav-panel', 'NavPanel', 'navpanel',
+          'left-panel', 'LeftPanel', 'leftpanel',
+          'left-nav', 'LeftNav', 'leftnav',
+          'dash-nav', 'DashNav', 'dashnav',
+          'dashboard-nav', 'DashboardNav',
+          'app-sidebar', 'AppSidebar',
+          'menu-panel', 'MenuPanel',
+          'navigation-panel', 'NavigationPanel'
+        ];
+
+        for (var i = 0; i < classPatterns.length; i++) {
+          var selector = '[class*="' + classPatterns[i] + '"]';
+          try {
+            var candidates = root.querySelectorAll(selector);
+            for (var j = 0; j < candidates.length; j++) {
+              var el = candidates[j];
+              var rect = el.getBoundingClientRect();
+              // Sidebar = tall (>200px height), narrow (<400px width)
+              if (rect.height > 200 && rect.width > 50 && rect.width < 400) {
+                sidebar = el;
+                break;
+              }
+            }
+          } catch(e) {}
+          if (sidebar) break;
+        }
+
+        // Also check <nav> and <aside> tags
+        if (!sidebar) {
+          var navs = root.querySelectorAll('nav, aside');
+          for (var n = 0; n < navs.length; n++) {
+            var navRect = navs[n].getBoundingClientRect();
+            if (navRect.height > 200 && navRect.width > 50 && navRect.width < 400) {
+              sidebar = navs[n];
+              break;
+            }
+          }
+        }
+
+        // ------- METHOD 2: Structural detection -------
+        // Look for flex/grid containers with a narrow first child
+        if (!sidebar) {
+          var searchContainers = function(parent) {
+            if (!parent || !parent.children) return false;
+            for (var c = 0; c < parent.children.length; c++) {
+              var container = parent.children[c];
+              var style = window.getComputedStyle(container);
+              var display = style.display;
+
+              if (display === 'flex' || display === 'grid' ||
+                  display === 'inline-flex' || display === 'inline-grid' ||
+                  display === '-webkit-flex') {
+
+                var kids = container.children;
+                if (kids.length >= 2) {
+                  var first = kids[0];
+                  var second = kids[1];
+                  var fRect = first.getBoundingClientRect();
+                  var sRect = second.getBoundingClientRect();
+
+                  // First child narrow + tall, second child wider = sidebar layout
+                  if (fRect.width > 50 && fRect.width < 350 &&
+                      fRect.height > window.innerHeight * 0.5 &&
+                      sRect.width > fRect.width) {
+                    sidebar = first;
+                    mainContent = second;
+                    layoutContainer = container;
+                    return true;
+                  }
+
+                  // Check last child too (sidebar on right)
+                  var last = kids[kids.length - 1];
+                  var lRect = last.getBoundingClientRect();
+                  if (last !== first &&
+                      lRect.width > 50 && lRect.width < 350 &&
+                      lRect.height > window.innerHeight * 0.5) {
+                    sidebar = last;
+                    mainContent = kids[0];
+                    layoutContainer = container;
+                    return true;
+                  }
+                }
+              }
+            }
+            return false;
+          };
+
+          var appRoot = root.children[0];
+          if (appRoot) {
+            if (!searchContainers(root)) {
+              searchContainers(appRoot);
+            }
+          }
+        }
+
+        // ------- METHOD 3: Fixed/absolute positioned elements -------
+        if (!sidebar) {
+          var allEls = root.querySelectorAll('div, nav, aside, section');
+          for (var m = 0; m < allEls.length; m++) {
+            var el2 = allEls[m];
+            try {
+              var style2 = window.getComputedStyle(el2);
+              var rect2 = el2.getBoundingClientRect();
+
+              if ((style2.position === 'fixed' || style2.position === 'absolute' || style2.position === 'sticky') &&
+                  rect2.width > 80 && rect2.width < 350 &&
+                  rect2.height > window.innerHeight * 0.6 &&
+                  rect2.left < 20) {
+                sidebar = el2;
+                break;
+              }
+            } catch(e) {}
+          }
+        }
+
+        // ------- BAIL OUT if nothing found -------
+        if (!sidebar) {
+          console.log('[MQ Responsive] No sidebar detected yet. Will retry...');
+          return false;
+        }
+
+        // ------- FIND MAIN CONTENT (if not already found) -------
+        if (!mainContent && sidebar.parentElement) {
+          var parent = sidebar.parentElement;
+          var siblings = parent.children;
+          for (var s = 0; s < siblings.length; s++) {
+            if (siblings[s] !== sidebar) {
+              var sRect = siblings[s].getBoundingClientRect();
+              if (sRect.width > 200 && sRect.height > 200) {
+                mainContent = siblings[s];
+                layoutContainer = parent;
+                break;
+              }
+            }
+          }
+        }
+
+        // ------- TAG ELEMENTS WITH DATA ATTRIBUTES -------
+        sidebar.setAttribute('data-mq-role', 'sidebar');
+        if (mainContent) mainContent.setAttribute('data-mq-role', 'main');
+        if (layoutContainer) layoutContainer.setAttribute('data-mq-role', 'layout');
+
+        detected = true;
+
+        console.log('[MQ Responsive] ✅ Sidebar found:', sidebar.className || sidebar.tagName);
+        if (mainContent) console.log('[MQ Responsive] ✅ Main content found:', mainContent.className || mainContent.tagName);
+        if (layoutContainer) console.log('[MQ Responsive] ✅ Layout container found:', layoutContainer.className || layoutContainer.tagName);
+
+        // Attach click listeners to sidebar links (close on navigate)
+        sidebar.addEventListener('click', function(e) {
+          var target = e.target;
+          while (target && target !== sidebar) {
+            if (target.tagName === 'A' || target.tagName === 'BUTTON') {
+              if (window.innerWidth <= 1024) {
+                setTimeout(closeSidebarFn, 200);
+              }
+              break;
+            }
+            target = target.parentElement;
+          }
+        });
+
+        return true;
+      }
+
+      /* ==========================================
+         4. OPEN / CLOSE SIDEBAR
+         ========================================== */
+      function openSidebarFn() {
+        if (!sidebar) return;
+        isOpen = true;
+        sidebar.classList.add('mq-open');
+        overlay.classList.add('active');
+        hamburger.textContent = '\u2715'; // ✕
+        hamburger.setAttribute('aria-label', 'Close navigation menu');
+        hamburger.setAttribute('aria-expanded', 'true');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeSidebarFn() {
+        if (!sidebar) return;
+        isOpen = false;
+        sidebar.classList.remove('mq-open');
+        overlay.classList.remove('active');
+        hamburger.textContent = '\u2630'; // ☰
+        hamburger.setAttribute('aria-label', 'Open navigation menu');
+        hamburger.setAttribute('aria-expanded', 'false');
+        document.body.style.overflow = '';
+      }
+
+      /* ==========================================
+         5. EVENT LISTENERS
+         ========================================== */
+      hamburger.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        // Lazy detection on first click
+        if (!detected) findSidebar();
+
+        if (isOpen) {
+          closeSidebarFn();
+        } else {
+          openSidebarFn();
+        }
+      });
+
+      overlay.addEventListener('click', function(e) {
+        e.preventDefault();
+        closeSidebarFn();
+      });
+
+      // Escape key closes sidebar
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && isOpen) {
+          closeSidebarFn();
+        }
+      });
+
+      // On resize to desktop, close mobile sidebar
+      var resizeTimer;
+      window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+          if (window.innerWidth > 1024 && isOpen) {
+            closeSidebarFn();
+          }
+        }, 150);
+      });
+
+      window.addEventListener('orientationchange', function() {
+        setTimeout(function() {
+          if (window.innerWidth > 1024 && isOpen) {
+            closeSidebarFn();
+          }
+        }, 300);
+      });
+
+      /* ==========================================
+         6. DETECTION LOOP — Wait for React to render
+         ========================================== */
+      var attempts = 0;
+      var maxAttempts = 100; // 100 × 300ms = 30 seconds max
+
+      function tryDetect() {
+        if (detected) return;
+        attempts++;
+
+        if (findSidebar()) {
+          console.log('[MQ Responsive] Detection succeeded on attempt #' + attempts);
+          return;
+        }
+
+        if (attempts < maxAttempts) {
+          setTimeout(tryDetect, 300);
+        } else {
+          console.log('[MQ Responsive] Could not detect sidebar after ' + maxAttempts + ' attempts.');
+          console.log('[MQ Responsive] Applying emergency fallback styles...');
+          applyFallbackFix();
+        }
+      }
+
+      /* ==========================================
+         7. FALLBACK FIX — If detection fails completely
+         ========================================== */
+      function applyFallbackFix() {
+        var fallbackCSS = document.createElement('style');
+        fallbackCSS.textContent =
+          '@media screen and (max-width:1024px){' +
+            '#root>div{display:flex!important;flex-direction:column!important;width:100%!important;overflow-x:hidden!important}' +
+            '#root>div>*:first-child{position:fixed!important;top:0!important;left:0!important;width:280px!important;max-width:85vw!important;height:100vh!important;z-index:100000!important;transform:translateX(-100%)!important;transition:transform .3s ease!important;overflow-y:auto!important}' +
+            '#root>div>*:first-child.mq-open{transform:translateX(0)!important;box-shadow:5px 0 25px rgba(0,0,0,.3)!important}' +
+            '#root>div>*:nth-child(2){width:100%!important;margin-left:0!important;padding-top:65px!important;min-width:0!important}' +
+            '#root>div>nav,#root>div>aside{position:fixed!important;top:0!important;left:0!important;width:280px!important;height:100vh!important;z-index:100000!important;transform:translateX(-100%)!important;transition:transform .3s ease!important}' +
+            '#root>div>nav.mq-open,#root>div>aside.mq-open{transform:translateX(0)!important}' +
+          '}';
+        document.head.appendChild(fallbackCSS);
+
+        // Try to attach toggle to first child as sidebar
+        var root = document.getElementById('root');
+        if (root && root.children[0] && root.children[0].children.length >= 2) {
+          var fc = root.children[0].children[0];
+          var sc = root.children[0].children[1];
+          sidebar = fc;
+          mainContent = sc;
+          detected = true;
+          console.log('[MQ Responsive] Fallback applied to first child element');
+        }
+      }
+
+      /* ==========================================
+         8. MUTATION OBSERVER — Handle React route changes
+         ========================================== */
+      var rootEl = document.getElementById('root');
+      if (rootEl) {
+        var observerTimer = null;
+        var observer = new MutationObserver(function(mutations) {
+          clearTimeout(observerTimer);
+          observerTimer = setTimeout(function() {
+            // If sidebar was removed from DOM (route change), re-detect
+            if (sidebar && !document.body.contains(sidebar)) {
+              console.log('[MQ Responsive] Sidebar lost from DOM. Re-detecting...');
+              detected = false;
+              sidebar = null;
+              mainContent = null;
+              layoutContainer = null;
+              isOpen = false;
+              overlay.classList.remove('active');
+              hamburger.textContent = '\u2630';
+              document.body.style.overflow = '';
+              attempts = 0;
+              tryDetect();
+            }
+
+            // If not yet detected, try again
+            if (!detected) {
+              tryDetect();
+            }
+          }, 400);
+        });
+
+        observer.observe(rootEl, {
+          childList: true,
+          subtree: true
+        });
+      }
+
+      /* ==========================================
+         9. FIX OVERFLOWING ELEMENTS
+         ========================================== */
+      function fixOverflows() {
+        if (window.innerWidth > 1024) return;
+        var vw = document.documentElement.clientWidth;
+        var elements = document.querySelectorAll('#root *');
+
+        for (var i = 0; i < elements.length; i++) {
+          var el = elements[i];
+          if (el.scrollWidth > vw + 10) {
+            el.style.maxWidth = '100%';
+            el.style.overflowX = 'auto';
+          }
+        }
+      }
+
+      window.addEventListener('load', function() {
+        setTimeout(fixOverflows, 1000);
+      });
+
+      /* ==========================================
+         10. START DETECTION
+         ========================================== */
+      // Wait for React to mount, then start looking
+      function startDetection() {
+        setTimeout(tryDetect, 800);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startDetection);
+      } else {
+        startDetection();
+      }
+
+      // Log device info
+      window.addEventListener('load', function() {
+        console.log(
+          '[MQ Responsive] Device: ' + window.innerWidth + 'x' + window.innerHeight +
+          ' | DPR: ' + (window.devicePixelRatio || 1) +
+          ' | Mobile: ' + (window.innerWidth <= 1024)
+        );
+      });
+
+    })();
+    </script>
   </body>
 </html>
